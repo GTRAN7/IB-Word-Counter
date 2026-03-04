@@ -22,15 +22,52 @@ interface Popover {
   y: number;
 }
 
+/** Try to locate `needle` in `haystack`, tolerating whitespace differences. */
+function findSpan(
+  haystack: string,
+  needle: string
+): { start: number; end: number } | null {
+  // 1. Exact match
+  const exact = haystack.indexOf(needle);
+  if (exact !== -1) return { start: exact, end: exact + needle.length };
+
+  // 2. Whitespace-normalised regex: collapse any run of whitespace to \s+
+  try {
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = escaped.replace(/\s+/g, '\\s+');
+    // Guard against catastrophic backtracking on huge patterns
+    if (pattern.length < 8000) {
+      const re = new RegExp(pattern);
+      const m = re.exec(haystack);
+      if (m) return { start: m.index, end: m.index + m[0].length };
+    }
+  } catch {
+    // ignore regex errors
+  }
+
+  return null;
+}
+
 function buildSegments(text: string, exclusions: ExcludedItem[]): Segment[] {
   const spans: { start: number; end: number; itemIndex: number }[] = [];
 
   for (let i = 0; i < exclusions.length; i++) {
     const content = exclusions[i].content?.trim();
     if (!content || content.length < 3) continue;
-    const idx = text.indexOf(content);
-    if (idx !== -1) {
-      spans.push({ start: idx, end: idx + content.length, itemIndex: i });
+
+    // Try the whole block first
+    const wholeMatch = findSpan(text, content);
+    if (wholeMatch) {
+      spans.push({ ...wholeMatch, itemIndex: i });
+      continue;
+    }
+
+    // Multi-line content (e.g. bibliography, title page) may not be
+    // contiguous in the original — match each non-empty line individually.
+    const lines = content.split('\n').map(l => l.trim()).filter(l => l.length >= 3);
+    for (const line of lines) {
+      const m = findSpan(text, line);
+      if (m) spans.push({ ...m, itemIndex: i });
     }
   }
 

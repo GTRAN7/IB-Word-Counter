@@ -26,7 +26,7 @@ export default function PdfUploader({ onTextExtracted }: Props) {
     try {
       const pdfjsLib = await import('pdfjs-dist');
       // Use absolute URL so browser can fetch the worker correctly
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.js`;
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
